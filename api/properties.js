@@ -1,11 +1,27 @@
 export default async function handler(req, res) {
-
   // =========================
   // CORS (required for Webflow)
   // =========================
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // =========================
+  // CHECK API KEY
+  // =========================
+  const allowedIP = "192.168.1.19";
+
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0] || "";
+
+  const apiKey = req.headers["x-api-key"];
+
+  if (ip !== allowedIP || apiKey !== process.env.LODGIFY_API_KEY) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
+  res.status(200).json({ message: "Access granted" });
+//----------------------------------------------------
+
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -19,7 +35,7 @@ export default async function handler(req, res) {
     // =========================
     if (!API_KEY) {
       return res.status(500).json({
-        error: "Missing LODGIFY_API_KEY in Vercel environment variables"
+        error: "Missing LODGIFY_API_KEY in Vercel environment variables",
       });
     }
 
@@ -30,8 +46,8 @@ export default async function handler(req, res) {
       method: "GET",
       headers: {
         "X-ApiKey": API_KEY,
-        "Content-Type": "application/json"
-      }
+        "Content-Type": "application/json",
+      },
     });
 
     const text = await response.text();
@@ -42,7 +58,7 @@ export default async function handler(req, res) {
     } catch (err) {
       return res.status(500).json({
         error: "Invalid JSON from Lodgify",
-        raw: text
+        raw: text,
       });
     }
 
@@ -52,15 +68,14 @@ export default async function handler(req, res) {
     if (!response.ok) {
       return res.status(response.status).json({
         error: "Lodgify API error",
-        details: data
+        details: data,
       });
     }
 
     return res.status(200).json(data);
-
   } catch (error) {
     return res.status(500).json({
-      error: error.message
+      error: error.message,
     });
   }
 }
