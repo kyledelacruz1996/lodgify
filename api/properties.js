@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   // =========================
-  // CHECK IP ADDRESS 
+  // CHECK IP ADDRESS
   // =========================
   // const allowedIP = "172.64.151.8"; // Lodgify's IP address (as of 2024-06)
 
@@ -25,16 +25,16 @@ export default async function handler(req, res) {
   // CHECK Hostname
   // =========================
 
-//   const allowedOrigin = "https://staywildescape.webflow.io";
-// const apiKey = req.headers["x-api-key"];
+  //   const allowedOrigin = "https://staywildescape.webflow.io";
+  // const apiKey = req.headers["x-api-key"];
 
-// const origin = req.headers.origin || "";
+  // const origin = req.headers.origin || "";
 
-// if (origin !== allowedOrigin || apiKey !== process.env.LODGIFY_API_KEY) {
-//   return res.status(403).json({ message: "Forbidden" });
-// }
+  // if (origin !== allowedOrigin || apiKey !== process.env.LODGIFY_API_KEY) {
+  //   return res.status(403).json({ message: "Forbidden" });
+  // }
 
-// return res.status(200).json({ message: "Access granted" });
+  // return res.status(200).json({ message: "Access granted" });
 
   //----------------------------------------------------
 
@@ -55,9 +55,21 @@ export default async function handler(req, res) {
     }
 
     // =========================
+    // GET ID FROM ROUTE PARAM
+    // =========================
+    const { id } = req.query; // for Next.js API routes OR use req.params.id in Express
+
+    // =========================
+    // BUILD URL
+    // =========================
+    const url = id
+      ? `https://api.lodgify.com/v2/properties/${id}`
+      : "https://api.lodgify.com/v2/properties";
+
+    // =========================
     // FETCH LODGIFY
     // =========================
-    const response = await fetch("https://api.lodgify.com/v2/properties", {
+    const response = await fetch(url, {
       method: "GET",
       headers: {
         "X-ApiKey": API_KEY,
