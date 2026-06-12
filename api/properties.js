@@ -25,16 +25,16 @@ export default async function handler(req, res) {
   // CHECK Hostname
   // =========================
 
-  const allowedOrigin = "https://staywildescape.webflow.io";
-const apiKey = req.headers["x-api-key"];
+//   const allowedOrigin = "https://staywildescape.webflow.io";
+// const apiKey = req.headers["x-api-key"];
 
-const origin = req.headers.origin || "";
+// const origin = req.headers.origin || "";
 
-if (origin !== allowedOrigin || apiKey !== process.env.LODGIFY_API_KEY) {
-  return res.status(403).json({ message: "Forbidden" });
-}
+// if (origin !== allowedOrigin || apiKey !== process.env.LODGIFY_API_KEY) {
+//   return res.status(403).json({ message: "Forbidden" });
+// }
 
-return res.status(200).json({ message: "Access granted" });
+// return res.status(200).json({ message: "Access granted" });
 
   //----------------------------------------------------
 
