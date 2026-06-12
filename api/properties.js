@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   // =========================
   // CHECK API KEY
   // =========================
-  const allowedIP = "192.168.1.19";
+  const allowedIP = "198.202.211.1"; // Lodgify's IP address (as of 2024-06)
 
   const ip = req.headers["x-forwarded-for"]?.split(",")[0] || "";
 
@@ -20,8 +20,8 @@ export default async function handler(req, res) {
   }
 
   res.status(200).json({ message: "Access granted" });
-//----------------------------------------------------
 
+  //----------------------------------------------------
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
