@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   // =========================
   // CHECK API KEY
   // =========================
-  const allowedIP = "172.64.151.8"; // Lodgify's IP address (as of 2024-06)
+  const allowedIP = "staywildescape.webflow.io"; // Lodgify's IP address (as of 2024-06)
 
   const ip = req.headers["x-forwarded-for"]?.split(",")[0] || "";
 
