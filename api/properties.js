@@ -36,12 +36,15 @@ export default async function handler(req, res) {
     const validDates = start && end && isValidDate(start) && isValidDate(end);
 
     // =========================
-    // BUILD URLs
+    // BUILD PROPERTY URL
     // =========================
     const propertyUrl = id
       ? `https://api.lodgify.com/v2/properties/${id}`
       : "https://api.lodgify.com/v2/properties";
 
+    // =========================
+    // BUILD AVAILABILITY URL
+    // =========================
     const availabilityUrl =
       id && validDates
         ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${start}&end=${end}`
@@ -78,14 +81,7 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // ⭐ FIX: SORT BY ID (ONLY IF ARRAY)
-    // =========================
-    if (Array.isArray(propertyData)) {
-      propertyData.sort((a, b) => (a.id || 0) - (b.id || 0));
-    }
-
-    // =========================
-    // FETCH AVAILABILITY
+    // FETCH AVAILABILITY (SAFE)
     // =========================
     let availabilityData = null;
 
@@ -127,7 +123,7 @@ export default async function handler(req, res) {
         id: id || null,
         start: validDates ? start : null,
         end: validDates ? end : null,
-        sortedBy: Array.isArray(propertyData) ? "id" : null,
+        hasAvailability: !!availabilityUrl,
       },
     });
   } catch (error) {
