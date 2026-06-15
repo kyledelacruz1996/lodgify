@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   // =========================
-  // CORS
+  // CORS (required for Webflow)
   // =========================
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
@@ -13,99 +13,109 @@ export default async function handler(req, res) {
   try {
     const API_KEY = process.env.LODGIFY_API_KEY;
 
+    // =========================
+    // CHECK API KEY
+    // =========================
     if (!API_KEY) {
       return res.status(500).json({
-        error: "Missing LODGIFY_API_KEY",
+        error: "Missing LODGIFY_API_KEY in Vercel environment variables",
       });
     }
 
-    const { id, calendar } = req.query;
+    // =========================
+    // GET ID + DATES
+    // =========================
+    const { id, start: startParam, end: endParam } = req.query;
 
     // =========================
-    // GET ALL PROPERTIES
+    // BUILD URLS
     // =========================
-    if (!id) {
-      const response = await fetch(
-        "https://api.lodgify.com/v2/properties",
-        {
+    const propertyUrl = id
+      ? `https://api.lodgify.com/v2/properties/${id}`
+      : "https://api.lodgify.com/v2/properties";
+
+    const availabilityUrl =
+      id && startParam && endParam
+        ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${startParam}&end=${endParam}`
+        : null;
+
+    // =========================
+    // FETCH DATA
+    // =========================
+    const requests = [
+      fetch(propertyUrl, {
+        method: "GET",
+        headers: {
+          "X-ApiKey": API_KEY,
+          "Content-Type": "application/json",
+        },
+      }),
+    ];
+
+    if (availabilityUrl) {
+      requests.push(
+        fetch(availabilityUrl, {
           method: "GET",
           headers: {
             "X-ApiKey": API_KEY,
             "Content-Type": "application/json",
           },
-        }
+        })
       );
-
-      const data = await response.json();
-
-      return res.status(response.status).json(data);
     }
 
-    // =========================
-    // GET PROPERTY DETAILS
-    // =========================
-    const propertyResponse = await fetch(
-      `https://api.lodgify.com/v2/properties/${id}`,
-      {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const responses = await Promise.all(requests);
 
-    const property = await propertyResponse.json();
-
-    // =========================
-    // RETURN PROPERTY ONLY
-    // =========================
-    if (calendar !== "true") {
-      return res.status(200).json(property);
-    }
-
-    // =========================
-    // CALENDAR DATE RANGE
-    // =========================
-    const today = new Date();
-
-    const startDate = today.toISOString().split("T")[0];
-
-    const endDateObj = new Date();
-    endDateObj.setMonth(endDateObj.getMonth() + 12);
-
-    const endDate = endDateObj.toISOString().split("T")[0];
-
-    // =========================
-    // FETCH AVAILABILITY
-    // =========================
-    const availabilityResponse = await fetch(
-      `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${startDate}&end=${endDate}`,
-      {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const availabilityText = await availabilityResponse.text();
-
-    let availability;
+    const propertyText = await responses[0].text();
+    let propertyData;
 
     try {
-      availability = JSON.parse(availabilityText);
-    } catch (e) {
-      availability = {
-        error: "Availability response is not JSON",
-        raw: availabilityText,
-      };
+      propertyData = JSON.parse(propertyText);
+    } catch {
+      return res.status(500).json({
+        error: "Invalid JSON from Lodgify (property)",
+        raw: propertyText,
+      });
     }
 
+    let availabilityData = null;
+
+    if (responses[1]) {
+      const availabilityText = await responses[1].text();
+
+      try {
+        availabilityData = JSON.parse(availabilityText);
+      } catch {
+        return res.status(500).json({
+          error: "Invalid JSON from Lodgify (availability)",
+          raw: availabilityText,
+        });
+      }
+    }
+
+    // =========================
+    // HANDLE ERRORS
+    // =========================
+    if (!responses[0].ok) {
+      return res.status(responses[0].status).json({
+        error: "Lodgify Property API error",
+        details: propertyData,
+      });
+    }
+
+    if (responses[1] && !responses[1].ok) {
+      return res.status(responses[1].status).json({
+        error: "Lodgify Availability API error",
+        details: availabilityData,
+      });
+    }
+
+    // =========================
+    // FINAL RESPONSE
+    // =========================
     return res.status(200).json({
-      property,
-      availability,
+      property: propertyData,
+      availability: availabilityData,
     });
   } catch (error) {
     return res.status(500).json({
