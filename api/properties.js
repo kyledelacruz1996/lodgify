@@ -53,29 +53,29 @@ export default async function handler(req, res) {
     // =========================
     // FETCH IN PARALLEL
     // =========================
-    const [propertyRes, availabilityRes] = await Promise.all([
-      fetch(propertyUrl, {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }),
-      fetch(availabilityUrl, {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }),
-      fetch(propertAllUrl, {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }),
-    ]);
+const [propertyRes, availabilityRes, propertiesRes] = await Promise.all([
+  fetch(propertyUrl, {
+    method: "GET",
+    headers: {
+      "X-ApiKey": API_KEY,
+      "Content-Type": "application/json",
+    },
+  }),
+  fetch(availabilityUrl, {
+    method: "GET",
+    headers: {
+      "X-ApiKey": API_KEY,
+      "Content-Type": "application/json",
+    },
+  }),
+  fetch(propertiesAllUrl, {
+    method: "GET",
+    headers: {
+      "X-ApiKey": API_KEY,
+      "Content-Type": "application/json",
+    },
+  }),
+]);
 
     const [propertyText, availabilityText] = await Promise.all([
       propertyRes.text(),
