@@ -42,6 +42,24 @@ export default async function handler(req, res) {
     const defaultEnd =
       end || defaultEndDate.toISOString().split("T")[0];
 
+          // =========================
+    // 1. FETCH ALL PROPERTIES
+    // =========================
+    const propertiesRes = await fetch(
+      "https://api.lodgify.com/v2/properties",
+      {
+        method: "GET",
+        headers: {
+          "X-ApiKey": API_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const propertiesData = await propertiesRes.json();
+
+    const properties = propertiesData?.items || propertiesData || [];
+
     // =========================
     // ENDPOINTS
     // =========================
