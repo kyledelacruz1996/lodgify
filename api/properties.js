@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   // =========================
-  // CORS (required for Webflow)
+  // CORS (Webflow support)
   // =========================
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
     if (!API_KEY) {
       return res.status(500).json({
-        error: "Missing LODGIFY_API_KEY in Vercel environment variables",
+        error: "Missing LODGIFY_API_KEY in environment variables",
       });
     }
 
@@ -31,24 +31,29 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // PROPERTY ENDPOINT
+    // DEFAULT DATE RANGE (30 days)
+    // =========================
+    const today = new Date();
+    const defaultStart =
+      start || today.toISOString().split("T")[0];
+
+    const defaultEndDate = new Date();
+    defaultEndDate.setDate(today.getDate() + 30);
+    const defaultEnd =
+      end || defaultEndDate.toISOString().split("T")[0];
+
+    // =========================
+    // ENDPOINTS
     // =========================
     const propertyUrl = `https://api.lodgify.com/v2/properties/${id}`;
 
-    // =========================
-    // CALENDAR ENDPOINT
-    // =========================
-    const calendarUrl = new URL("https://api.lodgify.com/v2/calendar");
-    calendarUrl.searchParams.append("propertyId", id);
-
-    // optional date range (recommended)
-    if (start) calendarUrl.searchParams.append("start", start);
-    if (end) calendarUrl.searchParams.append("end", end);
+    // 🔥 IMPORTANT: THIS IS THE CORRECT ONE
+    const availabilityUrl = `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${defaultStart}&end=${defaultEnd}`;
 
     // =========================
-    // FETCH BOTH IN PARALLEL
+    // FETCH IN PARALLEL
     // =========================
-    const [propertyRes, calendarRes] = await Promise.all([
+    const [propertyRes, availabilityRes] = await Promise.all([
       fetch(propertyUrl, {
         method: "GET",
         headers: {
@@ -56,7 +61,7 @@ export default async function handler(req, res) {
           "Content-Type": "application/json",
         },
       }),
-      fetch(calendarUrl.toString(), {
+      fetch(availabilityUrl, {
         method: "GET",
         headers: {
           "X-ApiKey": API_KEY,
@@ -65,54 +70,71 @@ export default async function handler(req, res) {
       }),
     ]);
 
-    const [propertyText, calendarText] = await Promise.all([
+    const [propertyText, availabilityText] = await Promise.all([
       propertyRes.text(),
-      calendarRes.text(),
+      availabilityRes.text(),
     ]);
 
-    let propertyData, calendarData;
+    let propertyData, availabilityData;
 
     try {
       propertyData = JSON.parse(propertyText);
     } catch {
       return res.status(500).json({
-        error: "Invalid JSON from Lodgify (property)",
+        error: "Invalid JSON from property API",
         raw: propertyText,
       });
     }
 
     try {
-      calendarData = JSON.parse(calendarText);
+      availabilityData = JSON.parse(availabilityText);
     } catch {
       return res.status(500).json({
-        error: "Invalid JSON from Lodgify (calendar)",
-        raw: calendarText,
+        error: "Invalid JSON from availability API",
+        raw: availabilityText,
       });
     }
 
     // =========================
-    // HANDLE API ERRORS
+    // ERROR HANDLING
     // =========================
     if (!propertyRes.ok) {
       return res.status(propertyRes.status).json({
-        error: "Lodgify property API error",
+        error: "Property API error",
         details: propertyData,
       });
     }
 
-    if (!calendarRes.ok) {
-      return res.status(calendarRes.status).json({
-        error: "Lodgify calendar API error",
-        details: calendarData,
+    if (!availabilityRes.ok) {
+      return res.status(availabilityRes.status).json({
+        error: "Availability API error",
+        details: availabilityData,
       });
     }
+
+    // =========================
+    // FORMAT CALENDAR (CLEAN FOR FRONTEND)
+    // =========================
+    const calendar =
+      availabilityData?.dateWiseAvailability?.map((day) => ({
+        date: day.date,
+        status: day.status,
+        price: day.price?.amount || null,
+        currency: day.price?.currency || null,
+        minNights: day.minimumNights || null,
+      })) || [];
 
     // =========================
     // FINAL RESPONSE
     // =========================
     return res.status(200).json({
       property: propertyData,
-      calendar: calendarData,
+      calendar,
+      rawCalendar: availabilityData,
+      range: {
+        start: defaultStart,
+        end: defaultEnd,
+      },
     });
   } catch (error) {
     return res.status(500).json({
