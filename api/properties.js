@@ -45,7 +45,7 @@ export default async function handler(req, res) {
     // =========================
     // MODE 1: FETCH ALL PROPERTIES (NO ID)
     // =========================
-    if (!id) {
+    if (!start || !end) {
       const propertiesRes = await fetch(
         "https://api.lodgify.com/v2/properties",
         {
