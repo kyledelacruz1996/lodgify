@@ -15,24 +15,12 @@ export default async function handler(req, res) {
 
     if (!API_KEY) {
       return res.status(500).json({
-        error: "Missing LODGIFY_API_KEY in environment variables",
+        error: "Missing LODGIFY_API_KEY",
       });
     }
 
-    // =========================
-    // QUERY PARAMS
-    // =========================
     const { id, start, end } = req.query;
 
-    if (!id) {
-      return res.status(400).json({
-        error: "Missing property id",
-      });
-    }
-
-    // =========================
-    // DEFAULT DATE RANGE (30 days)
-    // =========================
     const today = new Date();
     const defaultStart = start || today.toISOString().split("T")[0];
 
@@ -40,70 +28,74 @@ export default async function handler(req, res) {
     defaultEndDate.setDate(today.getDate() + 30);
     const defaultEnd = end || defaultEndDate.toISOString().split("T")[0];
 
-    // =========================
-    // ENDPOINTS
-    // =========================
-    const propertiesAllUrl = `https://api.lodgify.com/v2/properties`;
-    const propertyUrl = `https://api.lodgify.com/v2/properties/${id}`;
-    const availabilityUrl = `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${defaultStart}&end=${defaultEnd}`;
+    const headers = {
+      "X-ApiKey": API_KEY,
+      "Content-Type": "application/json",
+    };
 
     // =========================
-    // FETCH IN PARALLEL
+    // MODE 1: FETCH ALL PROPERTIES
     // =========================
-    const [propertyRes, availabilityRes, propertiesRes] = await Promise.all([
-      fetch(propertyUrl, {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }),
-      fetch(availabilityUrl, {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }),
-      fetch(propertiesAllUrl, {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }),
-    ]);
+    if (!id) {
+      const propertiesRes = await fetch(
+        "https://api.lodgify.com/v2/properties",
+        { method: "GET", headers }
+      );
 
-    // =========================
-    // READ ALL TEXT SAFELY
-    // =========================
-    const [propertyText, availabilityText, propertiesText] = await Promise.all([
-      propertyRes.text(),
-      availabilityRes.text(),
-      propertiesRes.text(),
-    ]);
+      const propertiesText = await propertiesRes.text();
 
-    let propertyData, availabilityData, propertiesData;
+      let propertiesData;
+      try {
+        propertiesData = JSON.parse(propertiesText);
+      } catch {
+        return res.status(500).json({
+          error: "Invalid JSON from properties API",
+          raw: propertiesText,
+        });
+      }
 
-    try {
-      propertyData = JSON.parse(propertyText);
-      availabilityData = JSON.parse(availabilityText);
-      propertiesData = JSON.parse(propertiesText);
-    } catch (err) {
-      return res.status(500).json({
-        error: "Invalid JSON from Lodgify API",
-        details: err.message,
-        raw: {
-          propertyText,
-          availabilityText,
-          propertiesText,
-        },
+      if (!propertiesRes.ok) {
+        return res.status(propertiesRes.status).json({
+          error: "Properties API error",
+          details: propertiesData,
+        });
+      }
+
+      return res.status(200).json({
+        mode: "all",
+        count: propertiesData?.items?.length || 0,
+        properties: propertiesData,
       });
     }
 
     // =========================
-    // ERROR HANDLING
+    // MODE 2: SINGLE PROPERTY + CALENDAR
     // =========================
+    const propertyUrl = `https://api.lodgify.com/v2/properties/${id}`;
+
+    const availabilityUrl = `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${defaultStart}&end=${defaultEnd}`;
+
+    const [propertyRes, availabilityRes] = await Promise.all([
+      fetch(propertyUrl, { method: "GET", headers }),
+      fetch(availabilityUrl, { method: "GET", headers }),
+    ]);
+
+    const [propertyText, availabilityText] = await Promise.all([
+      propertyRes.text(),
+      availabilityRes.text(),
+    ]);
+
+    let propertyData, availabilityData;
+
+    try {
+      propertyData = JSON.parse(propertyText);
+      availabilityData = JSON.parse(availabilityText);
+    } catch {
+      return res.status(500).json({
+        error: "Invalid JSON from Lodgify API",
+      });
+    }
+
     if (!propertyRes.ok) {
       return res.status(propertyRes.status).json({
         error: "Property API error",
@@ -118,16 +110,6 @@ export default async function handler(req, res) {
       });
     }
 
-    if (!propertiesRes.ok) {
-      return res.status(propertiesRes.status).json({
-        error: "Properties API error",
-        details: propertiesData,
-      });
-    }
-
-    // =========================
-    // FORMAT CALENDAR
-    // =========================
     const calendar =
       availabilityData?.dateWiseAvailability?.map((day) => ({
         date: day.date,
@@ -137,14 +119,10 @@ export default async function handler(req, res) {
         minNights: day.minimumNights || null,
       })) || [];
 
-    // =========================
-    // FINAL RESPONSE
-    // =========================
     return res.status(200).json({
+      mode: "single",
       property: propertyData,
       calendar,
-      properties: propertiesData,
-      rawCalendar: availabilityData,
       range: {
         start: defaultStart,
         end: defaultEnd,
