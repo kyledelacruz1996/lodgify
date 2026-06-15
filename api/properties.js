@@ -23,52 +23,45 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // GET ID + DATES
+    // GET QUERY PARAMS (SAFE)
     // =========================
-    const { id, start: startParam, end: endParam } = req.query;
+    const id = req.query.id || req.query.Id; // FIX: supports both
+    const start = req.query.start;
+    const end = req.query.end;
 
     // =========================
-    // BUILD URLS
+    // DATE VALIDATION (IMPORTANT FIX)
+    // =========================
+    const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
+
+    const validDates = start && end && isValidDate(start) && isValidDate(end);
+
+    // =========================
+    // BUILD URLs
     // =========================
     const propertyUrl = id
       ? `https://api.lodgify.com/v2/properties/${id}`
       : "https://api.lodgify.com/v2/properties";
 
     const availabilityUrl =
-      id && startParam && endParam
-        ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${startParam}&end=${endParam}`
+      id && validDates
+        ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${start}&end=${end}`
         : null;
 
     // =========================
-    // FETCH DATA
+    // FETCH PROPERTY
     // =========================
-    const requests = [
-      fetch(propertyUrl, {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }),
-    ];
+    const propertyResponse = await fetch(propertyUrl, {
+      method: "GET",
+      headers: {
+        "X-ApiKey": API_KEY,
+        "Content-Type": "application/json",
+      },
+    });
 
-    if (availabilityUrl) {
-      requests.push(
-        fetch(availabilityUrl, {
-          method: "GET",
-          headers: {
-            "X-ApiKey": API_KEY,
-            "Content-Type": "application/json",
-          },
-        })
-      );
-    }
+    const propertyText = await propertyResponse.text();
 
-    const responses = await Promise.all(requests);
-
-    const propertyText = await responses[0].text();
     let propertyData;
-
     try {
       propertyData = JSON.parse(propertyText);
     } catch {
@@ -78,10 +71,28 @@ export default async function handler(req, res) {
       });
     }
 
+    if (!propertyResponse.ok) {
+      return res.status(propertyResponse.status).json({
+        error: "Lodgify Property API error",
+        details: propertyData,
+      });
+    }
+
+    // =========================
+    // FETCH AVAILABILITY (ONLY IF VALID)
+    // =========================
     let availabilityData = null;
 
-    if (responses[1]) {
-      const availabilityText = await responses[1].text();
+    if (availabilityUrl) {
+      const availabilityResponse = await fetch(availabilityUrl, {
+        method: "GET",
+        headers: {
+          "X-ApiKey": API_KEY,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const availabilityText = await availabilityResponse.text();
 
       try {
         availabilityData = JSON.parse(availabilityText);
@@ -91,23 +102,13 @@ export default async function handler(req, res) {
           raw: availabilityText,
         });
       }
-    }
 
-    // =========================
-    // HANDLE ERRORS
-    // =========================
-    if (!responses[0].ok) {
-      return res.status(responses[0].status).json({
-        error: "Lodgify Property API error",
-        details: propertyData,
-      });
-    }
-
-    if (responses[1] && !responses[1].ok) {
-      return res.status(responses[1].status).json({
-        error: "Lodgify Availability API error",
-        details: availabilityData,
-      });
+      if (!availabilityResponse.ok) {
+        return res.status(availabilityResponse.status).json({
+          error: "Lodgify Availability API error",
+          details: availabilityData,
+        });
+      }
     }
 
     // =========================
@@ -116,6 +117,11 @@ export default async function handler(req, res) {
     return res.status(200).json({
       property: propertyData,
       availability: availabilityData,
+      meta: {
+        id: id || null,
+        start: validDates ? start : null,
+        end: validDates ? end : null,
+      },
     });
   } catch (error) {
     return res.status(500).json({
