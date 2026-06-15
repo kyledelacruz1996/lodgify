@@ -13,9 +13,6 @@ export default async function handler(req, res) {
   try {
     const API_KEY = process.env.LODGIFY_API_KEY;
 
-    // =========================
-    // CHECK API KEY
-    // =========================
     if (!API_KEY) {
       return res.status(500).json({
         error: "Missing LODGIFY_API_KEY in Vercel environment variables",
@@ -23,26 +20,35 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // GET ID + DATES
+    // QUERY PARAMS
     // =========================
-    const { id, start: startParam, end: endParam } = req.query;
+    const { id, start, end } = req.query;
+
+    if (!id) {
+      return res.status(400).json({
+        error: "Missing property id",
+      });
+    }
 
     // =========================
-    // BUILD URLS
+    // PROPERTY ENDPOINT
     // =========================
-    const propertyUrl = id
-      ? `https://api.lodgify.com/v2/properties/${id}`
-      : "https://api.lodgify.com/v2/properties";
-
-    const availabilityUrl =
-      id && startParam && endParam
-        ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${startParam}&end=${endParam}`
-        : null;
+    const propertyUrl = `https://api.lodgify.com/v2/properties/${id}`;
 
     // =========================
-    // FETCH DATA
+    // CALENDAR ENDPOINT
     // =========================
-    const requests = [
+    const calendarUrl = new URL("https://api.lodgify.com/v2/calendar");
+    calendarUrl.searchParams.append("propertyId", id);
+
+    // optional date range (recommended)
+    if (start) calendarUrl.searchParams.append("start", start);
+    if (end) calendarUrl.searchParams.append("end", end);
+
+    // =========================
+    // FETCH BOTH IN PARALLEL
+    // =========================
+    const [propertyRes, calendarRes] = await Promise.all([
       fetch(propertyUrl, {
         method: "GET",
         headers: {
@@ -50,24 +56,21 @@ export default async function handler(req, res) {
           "Content-Type": "application/json",
         },
       }),
-    ];
+      fetch(calendarUrl.toString(), {
+        method: "GET",
+        headers: {
+          "X-ApiKey": API_KEY,
+          "Content-Type": "application/json",
+        },
+      }),
+    ]);
 
-    if (availabilityUrl) {
-      requests.push(
-        fetch(availabilityUrl, {
-          method: "GET",
-          headers: {
-            "X-ApiKey": API_KEY,
-            "Content-Type": "application/json",
-          },
-        })
-      );
-    }
+    const [propertyText, calendarText] = await Promise.all([
+      propertyRes.text(),
+      calendarRes.text(),
+    ]);
 
-    const responses = await Promise.all(requests);
-
-    const propertyText = await responses[0].text();
-    let propertyData;
+    let propertyData, calendarData;
 
     try {
       propertyData = JSON.parse(propertyText);
@@ -78,35 +81,29 @@ export default async function handler(req, res) {
       });
     }
 
-    let availabilityData = null;
-
-    if (responses[1]) {
-      const availabilityText = await responses[1].text();
-
-      try {
-        availabilityData = JSON.parse(availabilityText);
-      } catch {
-        return res.status(500).json({
-          error: "Invalid JSON from Lodgify (availability)",
-          raw: availabilityText,
-        });
-      }
+    try {
+      calendarData = JSON.parse(calendarText);
+    } catch {
+      return res.status(500).json({
+        error: "Invalid JSON from Lodgify (calendar)",
+        raw: calendarText,
+      });
     }
 
     // =========================
-    // HANDLE ERRORS
+    // HANDLE API ERRORS
     // =========================
-    if (!responses[0].ok) {
-      return res.status(responses[0].status).json({
-        error: "Lodgify Property API error",
+    if (!propertyRes.ok) {
+      return res.status(propertyRes.status).json({
+        error: "Lodgify property API error",
         details: propertyData,
       });
     }
 
-    if (responses[1] && !responses[1].ok) {
-      return res.status(responses[1].status).json({
-        error: "Lodgify Availability API error",
-        details: availabilityData,
+    if (!calendarRes.ok) {
+      return res.status(calendarRes.status).json({
+        error: "Lodgify calendar API error",
+        details: calendarData,
       });
     }
 
@@ -115,7 +112,7 @@ export default async function handler(req, res) {
     // =========================
     return res.status(200).json({
       property: propertyData,
-      availability: availabilityData,
+      calendar: calendarData,
     });
   } catch (error) {
     return res.status(500).json({
