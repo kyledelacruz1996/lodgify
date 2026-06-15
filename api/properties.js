@@ -62,14 +62,9 @@ export default async function handler(req, res) {
     // =========================
     // BUILD URL
     // =========================
-   const url = id
-  ? {
-      property: `https://api.lodgify.com/v2/properties/${id}`,
-      availability: `https://api.lodgify.com/v2/availability?propertyId=${id}&start=2026-06-01&end=2027-06-01`,
-    }
-  : {
-      property: "https://api.lodgify.com/v2/properties",
-    };
+    const url = id
+      ? `https://api.lodgify.com/v2/properties/${id}`
+      : "https://api.lodgify.com/v2/properties";
 
     // =========================
     // FETCH LODGIFY
