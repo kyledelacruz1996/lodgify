@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   // =========================
-  // CORS (Webflow support)
+  // CORS (required for Webflow)
   // =========================
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
@@ -13,6 +13,9 @@ export default async function handler(req, res) {
   try {
     const API_KEY = process.env.LODGIFY_API_KEY;
 
+    // =========================
+    // CHECK API KEY
+    // =========================
     if (!API_KEY) {
       return res.status(500).json({
         error: "Missing LODGIFY_API_KEY in Vercel environment variables",
@@ -20,38 +23,23 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // GET PARAMS
+    // GET PROPERTY ID
     // =========================
     const { id } = req.query;
 
     // =========================
-    // DATE RANGE (IMPORTANT FIX)
-    // start = today
-    // end = +12 months
-    // =========================
-    const startDateObj = new Date();
-    const endDateObj = new Date();
-    endDateObj.setFullYear(endDateObj.getFullYear() + 1);
-
-    const start = startDateObj.toISOString().split("T")[0];
-    const end = endDateObj.toISOString().split("T")[0];
-
-    // =========================
-    // PROPERTY URL
+    // BUILD URLS (IMPORTANT FIX)
     // =========================
     const propertyUrl = id
       ? `https://api.lodgify.com/v2/properties/${id}`
       : "https://api.lodgify.com/v2/properties";
 
-    // =========================
-    // AVAILABILITY URL (CALENDAR)
-    // =========================
     const availabilityUrl = id
-      ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${start}&end=${end}`
+      ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=2026-06-01&end=2027-06-01`
       : null;
 
     // =========================
-    // FETCH PROPERTY DATA
+    // FETCH PROPERTY
     // =========================
     const propertyResponse = await fetch(propertyUrl, {
       method: "GET",
@@ -81,7 +69,7 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // FETCH AVAILABILITY DATA
+    // FETCH AVAILABILITY (CALENDAR)
     // =========================
     let availabilityData = null;
 
@@ -107,15 +95,11 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // FINAL RESPONSE
+    // RETURN FINAL RESPONSE
     // =========================
     return res.status(200).json({
       property: propertyData,
-      calendar: {
-        start,
-        end,
-        availability: availabilityData,
-      },
+      availability: availabilityData,
     });
   } catch (error) {
     return res.status(500).json({
