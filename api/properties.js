@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   // =========================
-  // CORS (required for Webflow)
+  // CORS
   // =========================
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
@@ -13,93 +13,99 @@ export default async function handler(req, res) {
   try {
     const API_KEY = process.env.LODGIFY_API_KEY;
 
-    // =========================
-    // CHECK API KEY
-    // =========================
     if (!API_KEY) {
       return res.status(500).json({
-        error: "Missing LODGIFY_API_KEY in Vercel environment variables",
+        error: "Missing LODGIFY_API_KEY",
       });
     }
 
-    // =========================
-    // GET PROPERTY ID
-    // =========================
-    const { id } = req.query;
+    const { id, calendar } = req.query;
 
     // =========================
-    // BUILD URLS (IMPORTANT FIX)
+    // GET ALL PROPERTIES
     // =========================
-    const propertyUrl = id
-      ? `https://api.lodgify.com/v2/properties/${id}`
-      : "https://api.lodgify.com/v2/properties";
+    if (!id) {
+      const response = await fetch(
+        "https://api.lodgify.com/v2/properties",
+        {
+          method: "GET",
+          headers: {
+            "X-ApiKey": API_KEY,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-    const availabilityUrl = id
-      ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=2026-06-01&end=2027-06-01`
-      : null;
+      const data = await response.json();
 
-    // =========================
-    // FETCH PROPERTY
-    // =========================
-    const propertyResponse = await fetch(propertyUrl, {
-      method: "GET",
-      headers: {
-        "X-ApiKey": API_KEY,
-        "Content-Type": "application/json",
-      },
-    });
-
-    const propertyText = await propertyResponse.text();
-
-    let propertyData;
-    try {
-      propertyData = JSON.parse(propertyText);
-    } catch (err) {
-      return res.status(500).json({
-        error: "Invalid JSON from Lodgify (property)",
-        raw: propertyText,
-      });
-    }
-
-    if (!propertyResponse.ok) {
-      return res.status(propertyResponse.status).json({
-        error: "Lodgify property API error",
-        details: propertyData,
-      });
+      return res.status(response.status).json(data);
     }
 
     // =========================
-    // FETCH AVAILABILITY (CALENDAR)
+    // GET PROPERTY DETAILS
     // =========================
-    let availabilityData = null;
-
-    if (availabilityUrl) {
-      const availabilityResponse = await fetch(availabilityUrl, {
+    const propertyResponse = await fetch(
+      `https://api.lodgify.com/v2/properties/${id}`,
+      {
         method: "GET",
         headers: {
           "X-ApiKey": API_KEY,
           "Content-Type": "application/json",
         },
-      });
-
-      const availabilityText = await availabilityResponse.text();
-
-      try {
-        availabilityData = JSON.parse(availabilityText);
-      } catch (err) {
-        availabilityData = {
-          error: "Invalid JSON from Lodgify (availability)",
-          raw: availabilityText,
-        };
       }
+    );
+
+    const property = await propertyResponse.json();
+
+    // =========================
+    // RETURN PROPERTY ONLY
+    // =========================
+    if (calendar !== "true") {
+      return res.status(200).json(property);
     }
 
     // =========================
-    // RETURN FINAL RESPONSE
+    // CALENDAR DATE RANGE
     // =========================
+    const today = new Date();
+
+    const startDate = today.toISOString().split("T")[0];
+
+    const endDateObj = new Date();
+    endDateObj.setMonth(endDateObj.getMonth() + 12);
+
+    const endDate = endDateObj.toISOString().split("T")[0];
+
+    // =========================
+    // FETCH AVAILABILITY
+    // =========================
+    const availabilityResponse = await fetch(
+      `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${startDate}&end=${endDate}`,
+      {
+        method: "GET",
+        headers: {
+          "X-ApiKey": API_KEY,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const availabilityText = await availabilityResponse.text();
+
+    let availability;
+
+    try {
+      availability = JSON.parse(availabilityText);
+    } catch (e) {
+      availability = {
+        error: "Availability response is not JSON",
+        raw: availabilityText,
+      };
+    }
+
     return res.status(200).json({
-      property: propertyData,
-      availability: availabilityData,
+      property,
+      availability,
     });
   } catch (error) {
     return res.status(500).json({
