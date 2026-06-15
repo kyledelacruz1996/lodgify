@@ -25,7 +25,18 @@ export default async function handler(req, res) {
     // =========================
     // GET PROPERTY ID
     // =========================
-    const { id } = req.query;
+   const { id, start: startParam, end: endParam } = req.query;
+
+   const endDateObj = endParam
+  ? new Date(endParam)
+  : new Date();
+
+if (!endParam) {
+  endDateObj.setFullYear(endDateObj.getFullYear() + 1);
+}
+
+const start = startDateObj.toISOString().split("T")[0];
+const end = endDateObj.toISOString().split("T")[0];
 
     // =========================
     // BUILD URLS (IMPORTANT FIX)
@@ -35,7 +46,7 @@ export default async function handler(req, res) {
       : "https://api.lodgify.com/v2/properties";
 
     const availabilityUrl = id
-      ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=2026-06-01&end=2027-06-01`
+      ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${start}&end=${end}`
       : null;
 
     // =========================
