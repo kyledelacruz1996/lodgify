@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     // =========================
     // ENDPOINTS
     // =========================
-    const propertAllUrl = `https://api.lodgify.com/v2/properties`;
+    const propertiesAllUrl = `https://api.lodgify.com/v2/properties`;
 
     const propertyUrl = `https://api.lodgify.com/v2/properties/${id}`;
 
