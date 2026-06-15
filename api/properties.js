@@ -34,35 +34,17 @@ export default async function handler(req, res) {
     // DEFAULT DATE RANGE (30 days)
     // =========================
     const today = new Date();
-    const defaultStart =
-      start || today.toISOString().split("T")[0];
+    const defaultStart = start || today.toISOString().split("T")[0];
 
     const defaultEndDate = new Date();
     defaultEndDate.setDate(today.getDate() + 30);
-    const defaultEnd =
-      end || defaultEndDate.toISOString().split("T")[0];
-
-          // =========================
-    // 1. FETCH ALL PROPERTIES
-    // =========================
-    const propertiesRes = await fetch(
-      "https://api.lodgify.com/v2/properties",
-      {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const propertiesData = await propertiesRes.json();
-
-    const properties = propertiesData?.items || propertiesData || [];
+    const defaultEnd = end || defaultEndDate.toISOString().split("T")[0];
 
     // =========================
     // ENDPOINTS
     // =========================
+    const propertAllUrl = `https://api.lodgify.com/v2/properties`;
+
     const propertyUrl = `https://api.lodgify.com/v2/properties/${id}`;
 
     // 🔥 IMPORTANT: THIS IS THE CORRECT ONE
@@ -80,6 +62,13 @@ export default async function handler(req, res) {
         },
       }),
       fetch(availabilityUrl, {
+        method: "GET",
+        headers: {
+          "X-ApiKey": API_KEY,
+          "Content-Type": "application/json",
+        },
+      }),
+      fetch(propertAllUrl, {
         method: "GET",
         headers: {
           "X-ApiKey": API_KEY,
