@@ -30,17 +30,50 @@ export default async function handler(req, res) {
       });
     }
 
+    if (!id) {
+      const propertiesRes = await fetch(
+        "https://api.lodgify.com/v2/properties",
+        {
+          method: "GET",
+          headers,
+        },
+      );
+
+      const propertiesText = await propertiesRes.text();
+
+      let propertiesData;
+      try {
+        propertiesData = JSON.parse(propertiesText);
+      } catch {
+        return res.status(500).json({
+          error: "Invalid JSON from properties API",
+          raw: propertiesText,
+        });
+      }
+
+      if (!propertiesRes.ok) {
+        return res.status(propertiesRes.status).json({
+          error: "Properties API error",
+          details: propertiesData,
+        });
+      }
+
+      return res.status(200).json({
+        mode: "all",
+        count: propertiesData?.items?.length || 0,
+        properties: propertiesData,
+      });
+    }
+
     // =========================
     // DEFAULT DATE RANGE (30 days)
     // =========================
     const today = new Date();
-    const defaultStart =
-      start || today.toISOString().split("T")[0];
+    const defaultStart = start || today.toISOString().split("T")[0];
 
     const defaultEndDate = new Date();
     defaultEndDate.setDate(today.getDate() + 30);
-    const defaultEnd =
-      end || defaultEndDate.toISOString().split("T")[0];
+    const defaultEnd = end || defaultEndDate.toISOString().split("T")[0];
 
     // =========================
     // ENDPOINTS
