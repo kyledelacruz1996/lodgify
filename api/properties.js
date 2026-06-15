@@ -1,7 +1,4 @@
 export default async function handler(req, res) {
-  // =========================
-  // CORS (required for Webflow)
-  // =========================
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -13,31 +10,17 @@ export default async function handler(req, res) {
   try {
     const API_KEY = process.env.LODGIFY_API_KEY;
 
-    // =========================
-    // CHECK API KEY
-    // =========================
     if (!API_KEY) {
-      return res.status(500).json({
-        error: "Missing LODGIFY_API_KEY in Vercel environment variables",
-      });
+      return res.status(500).json({ error: "Missing API KEY" });
     }
 
-    // =========================
-    // GET QUERY PARAMS (SAFE)
-    // =========================
     const id = req.query.id || req.query.Id;
     const start = req.query.start;
     const end = req.query.end;
 
-    // =========================
-    // DATE VALIDATION
-    // =========================
     const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
     const validDates = start && end && isValidDate(start) && isValidDate(end);
 
-    // =========================
-    // BUILD URLs
-    // =========================
     const propertyUrl = id
       ? `https://api.lodgify.com/v2/properties/${id}`
       : "https://api.lodgify.com/v2/properties";
@@ -64,24 +47,18 @@ export default async function handler(req, res) {
     try {
       propertyData = JSON.parse(propertyText);
     } catch {
-      return res.status(500).json({
-        error: "Invalid JSON from Lodgify (property)",
-        raw: propertyText,
-      });
+      return res.status(500).json({ error: "Invalid property JSON" });
     }
 
     if (!propertyResponse.ok) {
-      return res.status(propertyResponse.status).json({
-        error: "Lodgify Property API error",
-        details: propertyData,
-      });
+      return res.status(propertyResponse.status).json(propertyData);
     }
 
     // =========================
-    // ⭐ FIX: SORT BY ID (ONLY IF ARRAY)
+    // ⭐ FIX: SORT CORRECT STRUCTURE
     // =========================
-    if (Array.isArray(propertyData)) {
-      propertyData.sort((a, b) => (a.id || 0) - (b.id || 0));
+    if (propertyData && Array.isArray(propertyData.items)) {
+      propertyData.items.sort((a, b) => (a.id || 0) - (b.id || 0));
     }
 
     // =========================
@@ -103,23 +80,14 @@ export default async function handler(req, res) {
       try {
         availabilityData = JSON.parse(availabilityText);
       } catch {
-        return res.status(500).json({
-          error: "Invalid JSON from Lodgify (availability)",
-          raw: availabilityText,
-        });
+        return res.status(500).json({ error: "Invalid availability JSON" });
       }
 
       if (!availabilityResponse.ok) {
-        return res.status(availabilityResponse.status).json({
-          error: "Lodgify Availability API error",
-          details: availabilityData,
-        });
+        return res.status(availabilityResponse.status).json(availabilityData);
       }
     }
 
-    // =========================
-    // FINAL RESPONSE
-    // =========================
     return res.status(200).json({
       property: propertyData,
       availability: availabilityData,
@@ -127,12 +95,10 @@ export default async function handler(req, res) {
         id: id || null,
         start: validDates ? start : null,
         end: validDates ? end : null,
-        sortedBy: Array.isArray(propertyData) ? "id" : null,
+        sorted: !!propertyData?.items,
       },
     });
   } catch (error) {
-    return res.status(500).json({
-      error: error.message,
-    });
+    return res.status(500).json({ error: error.message });
   }
 }
