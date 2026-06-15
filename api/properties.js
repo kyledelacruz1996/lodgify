@@ -20,71 +20,34 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // COMMON HEADERS (FIXED)
-    // =========================
-    const headers = {
-      "X-ApiKey": API_KEY,
-      "Content-Type": "application/json",
-    };
-
-    // =========================
     // QUERY PARAMS
     // =========================
     const { id, start, end } = req.query;
+
+    if (!id) {
+      return res.status(400).json({
+        error: "Missing property id",
+      });
+    }
 
     // =========================
     // DEFAULT DATE RANGE (30 days)
     // =========================
     const today = new Date();
-    const defaultStart = start || today.toISOString().split("T")[0];
+    const defaultStart =
+      start || today.toISOString().split("T")[0];
 
     const defaultEndDate = new Date();
     defaultEndDate.setDate(today.getDate() + 30);
-    const defaultEnd = end || defaultEndDate.toISOString().split("T")[0];
+    const defaultEnd =
+      end || defaultEndDate.toISOString().split("T")[0];
 
     // =========================
-    // MODE 1: FETCH ALL PROPERTIES (NO ID)
-    // =========================
-    if (!start || !end) {
-      const propertiesRes = await fetch(
-        "https://api.lodgify.com/v2/properties",
-        {
-          method: "GET",
-          headers,
-        }
-      );
-
-      const propertiesText = await propertiesRes.text();
-
-      let propertiesData;
-      try {
-        propertiesData = JSON.parse(propertiesText);
-      } catch {
-        return res.status(500).json({
-          error: "Invalid JSON from properties API",
-          raw: propertiesText,
-        });
-      }
-
-      if (!propertiesRes.ok) {
-        return res.status(propertiesRes.status).json({
-          error: "Properties API error",
-          details: propertiesData,
-        });
-      }
-
-      return res.status(200).json({
-        mode: "all",
-        count: propertiesData?.items?.length || 0,
-        properties: propertiesData,
-      });
-    }
-
-    // =========================
-    // MODE 2: SINGLE PROPERTY + CALENDAR
+    // ENDPOINTS
     // =========================
     const propertyUrl = `https://api.lodgify.com/v2/properties/${id}`;
 
+    // 🔥 IMPORTANT: THIS IS THE CORRECT ONE
     const availabilityUrl = `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${defaultStart}&end=${defaultEnd}`;
 
     // =========================
@@ -93,11 +56,17 @@ export default async function handler(req, res) {
     const [propertyRes, availabilityRes] = await Promise.all([
       fetch(propertyUrl, {
         method: "GET",
-        headers,
+        headers: {
+          "X-ApiKey": API_KEY,
+          "Content-Type": "application/json",
+        },
       }),
       fetch(availabilityUrl, {
         method: "GET",
-        headers,
+        headers: {
+          "X-ApiKey": API_KEY,
+          "Content-Type": "application/json",
+        },
       }),
     ]);
 
@@ -144,7 +113,7 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // FORMAT CALENDAR
+    // FORMAT CALENDAR (CLEAN FOR FRONTEND)
     // =========================
     const calendar =
       availabilityData?.dateWiseAvailability?.map((day) => ({
