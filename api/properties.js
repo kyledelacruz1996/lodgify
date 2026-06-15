@@ -35,7 +35,10 @@ export default async function handler(req, res) {
         "https://api.lodgify.com/v2/properties",
         {
           method: "GET",
-          headers,
+          headers: {
+            "X-ApiKey": API_KEY,
+            "Content-Type": "application/json",
+          },
         },
       );
 
