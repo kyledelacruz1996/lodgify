@@ -25,24 +25,26 @@ export default async function handler(req, res) {
     // =========================
     // GET QUERY PARAMS (SAFE)
     // =========================
-    const id = req.query.id || req.query.Id; // FIX: supports both
+    const id = req.query.id || req.query.Id;
     const start = req.query.start;
     const end = req.query.end;
 
     // =========================
-    // DATE VALIDATION (IMPORTANT FIX)
+    // DATE VALIDATION
     // =========================
     const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
-
     const validDates = start && end && isValidDate(start) && isValidDate(end);
 
     // =========================
-    // BUILD URLs
+    // BUILD PROPERTY URL
     // =========================
     const propertyUrl = id
       ? `https://api.lodgify.com/v2/properties/${id}`
       : "https://api.lodgify.com/v2/properties";
 
+    // =========================
+    // BUILD AVAILABILITY URL
+    // =========================
     const availabilityUrl =
       id && validDates
         ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${start}&end=${end}`
@@ -79,7 +81,7 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // FETCH AVAILABILITY (ONLY IF VALID)
+    // FETCH AVAILABILITY (SAFE)
     // =========================
     let availabilityData = null;
 
@@ -121,6 +123,7 @@ export default async function handler(req, res) {
         id: id || null,
         start: validDates ? start : null,
         end: validDates ? end : null,
+        hasAvailability: !!availabilityUrl,
       },
     });
   } catch (error) {
