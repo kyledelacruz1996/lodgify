@@ -45,7 +45,6 @@ export default async function handler(req, res) {
     // =========================
     const propertiesAllUrl = `https://api.lodgify.com/v2/properties`;
     const propertyUrl = `https://api.lodgify.com/v2/properties/${id}`;
-
     const availabilityUrl = `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${defaultStart}&end=${defaultEnd}`;
 
     // =========================
@@ -75,45 +74,30 @@ export default async function handler(req, res) {
       }),
     ]);
 
-    const [propertyText, availabilityText] = await Promise.all([
+    // =========================
+    // READ ALL TEXT SAFELY
+    // =========================
+    const [propertyText, availabilityText, propertiesText] = await Promise.all([
       propertyRes.text(),
       availabilityRes.text(),
+      propertiesRes.text(),
     ]);
-
-    // =========================
-    // FIX: ALSO READ propertiesRes (YOU WERE MISSING THIS)
-    // =========================
-    const propertiesText = await propertiesRes.text();
 
     let propertyData, availabilityData, propertiesData;
 
     try {
       propertyData = JSON.parse(propertyText);
-    } catch {
-      return res.status(500).json({
-        error: "Invalid JSON from property API",
-        raw: propertyText,
-      });
-    }
-
-    try {
       availabilityData = JSON.parse(availabilityText);
-    } catch {
-      return res.status(500).json({
-        error: "Invalid JSON from availability API",
-        raw: availabilityText,
-      });
-    }
-
-    // =========================
-    // FIX: PARSE propertiesRes
-    // =========================
-    try {
       propertiesData = JSON.parse(propertiesText);
-    } catch {
+    } catch (err) {
       return res.status(500).json({
-        error: "Invalid JSON from properties API",
-        raw: propertiesText,
+        error: "Invalid JSON from Lodgify API",
+        details: err.message,
+        raw: {
+          propertyText,
+          availabilityText,
+          propertiesText,
+        },
       });
     }
 
@@ -159,7 +143,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       property: propertyData,
       calendar,
-      properties: propertiesData, // ✅ FIX: now actually included
+      properties: propertiesData,
       rawCalendar: availabilityData,
       range: {
         start: defaultStart,
