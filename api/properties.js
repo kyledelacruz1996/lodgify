@@ -6,38 +6,6 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // =========================
-  // CHECK IP ADDRESS
-  // =========================
-  // const allowedIP = "172.64.151.8"; // Lodgify's IP address (as of 2024-06)
-
-  // const ip = req.headers["x-forwarded-for"]?.split(",")[0] || "";
-
-  // const apiKey = req.headers["x-api-key"];
-
-  // if (ip !== allowedIP || apiKey !== process.env.LODGIFY_API_KEY) {
-  //   return res.status(403).json({ message: "Forbidden" });
-  // }
-
-  // res.status(200).json({ message: "Access granted" });
-
-  // =========================
-  // CHECK Hostname
-  // =========================
-
-  //   const allowedOrigin = "https://staywildescape.webflow.io";
-  // const apiKey = req.headers["x-api-key"];
-
-  // const origin = req.headers.origin || "";
-
-  // if (origin !== allowedOrigin || apiKey !== process.env.LODGIFY_API_KEY) {
-  //   return res.status(403).json({ message: "Forbidden" });
-  // }
-
-  // return res.status(200).json({ message: "Access granted" });
-
-  //----------------------------------------------------
-
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -55,26 +23,25 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // GET ID FROM ROUTE PARAM
+    // GET PROPERTY ID
     // =========================
-    const { id } = req.query; // for Next.js API routes OR use req.params.id in Express
+    const { id } = req.query;
 
     // =========================
-    // BUILD URL
+    // BUILD URLS (IMPORTANT FIX)
     // =========================
-   const url = id
-  ? {
-      property: `https://api.lodgify.com/v2/properties/${id}`,
-      availability: `https://api.lodgify.com/v2/availability?propertyId=${id}&start=2026-06-01&end=2027-06-01`,
-    }
-  : {
-      property: "https://api.lodgify.com/v2/properties",
-    };
+    const propertyUrl = id
+      ? `https://api.lodgify.com/v2/properties/${id}`
+      : "https://api.lodgify.com/v2/properties";
+
+    const availabilityUrl = id
+      ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=2026-06-01&end=2027-06-01`
+      : null;
 
     // =========================
-    // FETCH LODGIFY
+    // FETCH PROPERTY
     // =========================
-    const response = await fetch(url, {
+    const propertyResponse = await fetch(propertyUrl, {
       method: "GET",
       headers: {
         "X-ApiKey": API_KEY,
@@ -82,29 +49,58 @@ export default async function handler(req, res) {
       },
     });
 
-    const text = await response.text();
+    const propertyText = await propertyResponse.text();
 
-    let data;
+    let propertyData;
     try {
-      data = JSON.parse(text);
+      propertyData = JSON.parse(propertyText);
     } catch (err) {
       return res.status(500).json({
-        error: "Invalid JSON from Lodgify",
-        raw: text,
+        error: "Invalid JSON from Lodgify (property)",
+        raw: propertyText,
+      });
+    }
+
+    if (!propertyResponse.ok) {
+      return res.status(propertyResponse.status).json({
+        error: "Lodgify property API error",
+        details: propertyData,
       });
     }
 
     // =========================
-    // HANDLE API ERRORS
+    // FETCH AVAILABILITY (CALENDAR)
     // =========================
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: "Lodgify API error",
-        details: data,
+    let availabilityData = null;
+
+    if (availabilityUrl) {
+      const availabilityResponse = await fetch(availabilityUrl, {
+        method: "GET",
+        headers: {
+          "X-ApiKey": API_KEY,
+          "Content-Type": "application/json",
+        },
       });
+
+      const availabilityText = await availabilityResponse.text();
+
+      try {
+        availabilityData = JSON.parse(availabilityText);
+      } catch (err) {
+        availabilityData = {
+          error: "Invalid JSON from Lodgify (availability)",
+          raw: availabilityText,
+        };
+      }
     }
 
-    return res.status(200).json(data);
+    // =========================
+    // RETURN FINAL RESPONSE
+    // =========================
+    return res.status(200).json({
+      property: propertyData,
+      availability: availabilityData,
+    });
   } catch (error) {
     return res.status(500).json({
       error: error.message,
