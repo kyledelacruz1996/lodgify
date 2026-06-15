@@ -6,6 +6,38 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
+  // =========================
+  // CHECK IP ADDRESS
+  // =========================
+  // const allowedIP = "172.64.151.8"; // Lodgify's IP address (as of 2024-06)
+
+  // const ip = req.headers["x-forwarded-for"]?.split(",")[0] || "";
+
+  // const apiKey = req.headers["x-api-key"];
+
+  // if (ip !== allowedIP || apiKey !== process.env.LODGIFY_API_KEY) {
+  //   return res.status(403).json({ message: "Forbidden" });
+  // }
+
+  // res.status(200).json({ message: "Access granted" });
+
+  // =========================
+  // CHECK Hostname
+  // =========================
+
+  // const allowedOrigin = "https://staywildescape.webflow.io";
+  // const apiKey = req.headers["x-api-key"];
+
+  // const origin = req.headers.origin || "";
+
+  // if (origin !== allowedOrigin || apiKey !== process.env.LODGIFY_API_KEY) {
+  //   return res.status(403).json({ message: "Forbidden" });
+  // }
+
+  // return res.status(200).json({ message: "Access granted" });
+
+  //----------------------------------------------------
+
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -40,7 +72,7 @@ export default async function handler(req, res) {
         };
 
     // =========================
-    // FIX: convert object → string URL (minimal change)
+    // FIX: prevent [object Object] error
     // =========================
     const finalUrl = url.property;
 
