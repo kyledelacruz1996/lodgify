@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   // =========================
-  // CORS (required for Webflow)
+  // CORS (Webflow support)
   // =========================
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
@@ -13,9 +13,6 @@ export default async function handler(req, res) {
   try {
     const API_KEY = process.env.LODGIFY_API_KEY;
 
-    // =========================
-    // CHECK API KEY
-    // =========================
     if (!API_KEY) {
       return res.status(500).json({
         error: "Missing LODGIFY_API_KEY in Vercel environment variables",
@@ -23,35 +20,38 @@ export default async function handler(req, res) {
     }
 
     // =========================
-    // GET QUERY PARAMS (SAFE)
+    // GET PARAMS
     // =========================
-    const id = req.query.id || req.query.Id;
-    const start = req.query.start;
-    const end = req.query.end;
+    const { id } = req.query;
 
     // =========================
-    // DATE VALIDATION
+    // DATE RANGE (IMPORTANT FIX)
+    // start = today
+    // end = +12 months
     // =========================
-    const isValidDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d);
-    const validDates = start && end && isValidDate(start) && isValidDate(end);
+    const startDateObj = new Date();
+    const endDateObj = new Date();
+    endDateObj.setFullYear(endDateObj.getFullYear() + 1);
+
+    const start = startDateObj.toISOString().split("T")[0];
+    const end = endDateObj.toISOString().split("T")[0];
 
     // =========================
-    // BUILD PROPERTY URL
+    // PROPERTY URL
     // =========================
     const propertyUrl = id
       ? `https://api.lodgify.com/v2/properties/${id}`
       : "https://api.lodgify.com/v2/properties";
 
     // =========================
-    // BUILD AVAILABILITY URL
+    // AVAILABILITY URL (CALENDAR)
     // =========================
-    const availabilityUrl =
-      id && validDates
-        ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${start}&end=${end}`
-        : null;
+    const availabilityUrl = id
+      ? `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${start}&end=${end}`
+      : null;
 
     // =========================
-    // FETCH PROPERTY
+    // FETCH PROPERTY DATA
     // =========================
     const propertyResponse = await fetch(propertyUrl, {
       method: "GET",
@@ -66,7 +66,7 @@ export default async function handler(req, res) {
     let propertyData;
     try {
       propertyData = JSON.parse(propertyText);
-    } catch {
+    } catch (err) {
       return res.status(500).json({
         error: "Invalid JSON from Lodgify (property)",
         raw: propertyText,
@@ -75,13 +75,13 @@ export default async function handler(req, res) {
 
     if (!propertyResponse.ok) {
       return res.status(propertyResponse.status).json({
-        error: "Lodgify Property API error",
+        error: "Lodgify property API error",
         details: propertyData,
       });
     }
 
     // =========================
-    // FETCH AVAILABILITY (SAFE)
+    // FETCH AVAILABILITY DATA
     // =========================
     let availabilityData = null;
 
@@ -98,18 +98,11 @@ export default async function handler(req, res) {
 
       try {
         availabilityData = JSON.parse(availabilityText);
-      } catch {
-        return res.status(500).json({
+      } catch (err) {
+        availabilityData = {
           error: "Invalid JSON from Lodgify (availability)",
           raw: availabilityText,
-        });
-      }
-
-      if (!availabilityResponse.ok) {
-        return res.status(availabilityResponse.status).json({
-          error: "Lodgify Availability API error",
-          details: availabilityData,
-        });
+        };
       }
     }
 
@@ -118,12 +111,10 @@ export default async function handler(req, res) {
     // =========================
     return res.status(200).json({
       property: propertyData,
-      availability: availabilityData,
-      meta: {
-        id: id || null,
-        start: validDates ? start : null,
-        end: validDates ? end : null,
-        hasAvailability: !!availabilityUrl,
+      calendar: {
+        start,
+        end,
+        availability: availabilityData,
       },
     });
   } catch (error) {
