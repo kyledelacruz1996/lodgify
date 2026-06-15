@@ -44,45 +44,48 @@ export default async function handler(req, res) {
     // ENDPOINTS
     // =========================
     const propertiesAllUrl = `https://api.lodgify.com/v2/properties`;
-
     const propertyUrl = `https://api.lodgify.com/v2/properties/${id}`;
 
-    // 🔥 IMPORTANT: THIS IS THE CORRECT ONE
     const availabilityUrl = `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${defaultStart}&end=${defaultEnd}`;
 
     // =========================
     // FETCH IN PARALLEL
     // =========================
-const [propertyRes, availabilityRes, propertiesRes] = await Promise.all([
-  fetch(propertyUrl, {
-    method: "GET",
-    headers: {
-      "X-ApiKey": API_KEY,
-      "Content-Type": "application/json",
-    },
-  }),
-  fetch(availabilityUrl, {
-    method: "GET",
-    headers: {
-      "X-ApiKey": API_KEY,
-      "Content-Type": "application/json",
-    },
-  }),
-  fetch(propertiesAllUrl, {
-    method: "GET",
-    headers: {
-      "X-ApiKey": API_KEY,
-      "Content-Type": "application/json",
-    },
-  }),
-]);
+    const [propertyRes, availabilityRes, propertiesRes] = await Promise.all([
+      fetch(propertyUrl, {
+        method: "GET",
+        headers: {
+          "X-ApiKey": API_KEY,
+          "Content-Type": "application/json",
+        },
+      }),
+      fetch(availabilityUrl, {
+        method: "GET",
+        headers: {
+          "X-ApiKey": API_KEY,
+          "Content-Type": "application/json",
+        },
+      }),
+      fetch(propertiesAllUrl, {
+        method: "GET",
+        headers: {
+          "X-ApiKey": API_KEY,
+          "Content-Type": "application/json",
+        },
+      }),
+    ]);
 
     const [propertyText, availabilityText] = await Promise.all([
       propertyRes.text(),
       availabilityRes.text(),
     ]);
 
-    let propertyData, availabilityData;
+    // =========================
+    // FIX: ALSO READ propertiesRes (YOU WERE MISSING THIS)
+    // =========================
+    const propertiesText = await propertiesRes.text();
+
+    let propertyData, availabilityData, propertiesData;
 
     try {
       propertyData = JSON.parse(propertyText);
@@ -103,6 +106,18 @@ const [propertyRes, availabilityRes, propertiesRes] = await Promise.all([
     }
 
     // =========================
+    // FIX: PARSE propertiesRes
+    // =========================
+    try {
+      propertiesData = JSON.parse(propertiesText);
+    } catch {
+      return res.status(500).json({
+        error: "Invalid JSON from properties API",
+        raw: propertiesText,
+      });
+    }
+
+    // =========================
     // ERROR HANDLING
     // =========================
     if (!propertyRes.ok) {
@@ -119,8 +134,15 @@ const [propertyRes, availabilityRes, propertiesRes] = await Promise.all([
       });
     }
 
+    if (!propertiesRes.ok) {
+      return res.status(propertiesRes.status).json({
+        error: "Properties API error",
+        details: propertiesData,
+      });
+    }
+
     // =========================
-    // FORMAT CALENDAR (CLEAN FOR FRONTEND)
+    // FORMAT CALENDAR
     // =========================
     const calendar =
       availabilityData?.dateWiseAvailability?.map((day) => ({
@@ -137,6 +159,7 @@ const [propertyRes, availabilityRes, propertiesRes] = await Promise.all([
     return res.status(200).json({
       property: propertyData,
       calendar,
+      properties: propertiesData, // ✅ FIX: now actually included
       rawCalendar: availabilityData,
       range: {
         start: defaultStart,
