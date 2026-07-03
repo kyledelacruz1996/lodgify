@@ -86,32 +86,38 @@ export default async function handler(req, res) {
     // 🔥 IMPORTANT: THIS IS THE CORRECT ONE
     const availabilityUrl = `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${defaultStart}&end=${defaultEnd}`;
 
+    const roomsUrl = `https://api.lodgify.com/v2/properties/${id}/rooms`;
+
     // =========================
     // FETCH IN PARALLEL
     // =========================
-    const [propertyRes, availabilityRes] = await Promise.all([
-      fetch(propertyUrl, {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }),
-      fetch(availabilityUrl, {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }),
-    ]);
+const headers = {
+  "X-ApiKey": API_KEY,
+  "Content-Type": "application/json",
+};
 
-    const [propertyText, availabilityText] = await Promise.all([
-      propertyRes.text(),
-      availabilityRes.text(),
-    ]);
+const [propertyRes, availabilityRes, roomsRes] = await Promise.all([
+  fetch(propertyUrl, {
+    method: "GET",
+    headers,
+  }),
+  fetch(availabilityUrl, {
+    method: "GET",
+    headers,
+  }),
+  fetch(roomsUrl, {
+    method: "GET",
+    headers,
+  }),
+]);
 
-    let propertyData, availabilityData;
+const [propertyText, availabilityText, roomsText] = await Promise.all([
+  propertyRes.text(),
+  availabilityRes.text(),
+  roomsRes.text(),
+]);
+
+    let propertyData, availabilityData, roomsData;
 
     try {
       propertyData = JSON.parse(propertyText);
@@ -124,7 +130,9 @@ export default async function handler(req, res) {
 
     try {
       availabilityData = JSON.parse(availabilityText);
+      roomsData = JSON.parse(roomsText);
     } catch {
+       roomsData = [];
       return res.status(500).json({
         error: "Invalid JSON from availability API",
         raw: availabilityText,
@@ -147,6 +155,10 @@ export default async function handler(req, res) {
         details: availabilityData,
       });
     }
+    
+    if (!roomsRes.ok) {
+  console.log("Rooms API:", roomsData);
+}
 
     // =========================
     // FORMAT CALENDAR (CLEAN FOR FRONTEND)
@@ -163,15 +175,22 @@ export default async function handler(req, res) {
     // =========================
     // FINAL RESPONSE
     // =========================
-    return res.status(200).json({
-      property: propertyData,
-      calendar,
-      rawCalendar: availabilityData,
-      range: {
-        start: defaultStart,
-        end: defaultEnd,
-      },
-    });
+return res.status(200).json({
+  property: propertyData,
+
+  rooms: Array.isArray(roomsData)
+    ? roomsData
+    : roomsData.items || [],
+
+  calendar,
+
+  rawCalendar: availabilityData,
+
+  range: {
+    start: defaultStart,
+    end: defaultEnd,
+  },
+});
   } catch (error) {
     return res.status(500).json({
       error: error.message,
