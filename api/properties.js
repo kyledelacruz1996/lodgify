@@ -83,16 +83,13 @@ export default async function handler(req, res) {
     // =========================
     const propertyUrl = `https://api.lodgify.com/v2/properties/${id}`;
 
-    // NEW: Rooms endpoint
-    const roomsUrl = `https://api.lodgify.com/v2/properties/${id}/rooms`;
-
-    // Availability endpoint
+    // 🔥 IMPORTANT: THIS IS THE CORRECT ONE
     const availabilityUrl = `https://api.lodgify.com/v2/availability?propertyId=${id}&start=${defaultStart}&end=${defaultEnd}`;
 
     // =========================
     // FETCH IN PARALLEL
     // =========================
-    const [propertyRes, roomsRes, availabilityRes] = await Promise.all([
+    const [propertyRes, availabilityRes] = await Promise.all([
       fetch(propertyUrl, {
         method: "GET",
         headers: {
@@ -100,15 +97,6 @@ export default async function handler(req, res) {
           "Content-Type": "application/json",
         },
       }),
-
-      fetch(roomsUrl, {
-        method: "GET",
-        headers: {
-          "X-ApiKey": API_KEY,
-          "Content-Type": "application/json",
-        },
-      }),
-
       fetch(availabilityUrl, {
         method: "GET",
         headers: {
@@ -118,13 +106,12 @@ export default async function handler(req, res) {
       }),
     ]);
 
-    const [propertyText, roomsText, availabilityText] = await Promise.all([
+    const [propertyText, availabilityText] = await Promise.all([
       propertyRes.text(),
-      roomsRes.text(),
       availabilityRes.text(),
     ]);
 
-    let propertyData, roomsData, availabilityData;
+    let propertyData, availabilityData;
 
     try {
       propertyData = JSON.parse(propertyText);
@@ -132,15 +119,6 @@ export default async function handler(req, res) {
       return res.status(500).json({
         error: "Invalid JSON from property API",
         raw: propertyText,
-      });
-    }
-
-    try {
-      roomsData = JSON.parse(roomsText);
-    } catch {
-      return res.status(500).json({
-        error: "Invalid JSON from rooms API",
-        raw: roomsText,
       });
     }
 
@@ -160,13 +138,6 @@ export default async function handler(req, res) {
       return res.status(propertyRes.status).json({
         error: "Property API error",
         details: propertyData,
-      });
-    }
-
-    if (!roomsRes.ok) {
-      return res.status(roomsRes.status).json({
-        error: "Rooms API error",
-        details: roomsData,
       });
     }
 
@@ -194,7 +165,6 @@ export default async function handler(req, res) {
     // =========================
     return res.status(200).json({
       property: propertyData,
-      rooms: roomsData,
       calendar,
       rawCalendar: availabilityData,
       range: {
