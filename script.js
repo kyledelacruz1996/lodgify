@@ -1,3 +1,4 @@
+<script>
 const loadBtn = document.getElementById("loadProperties");
 const propertiesContainer = document.getElementById("properties");
 
@@ -25,6 +26,8 @@ async function loadProperties() {
       const detailsRes = await fetch(`/api/properties?id=${property.id}`);
       const details = await detailsRes.json();
 
+      console.log("Property Details:", details);
+
       const rooms = details.rooms || [];
 
       const div = document.createElement("div");
@@ -50,40 +53,51 @@ async function loadProperties() {
           ${property.longitude ?? "-"}
         </p>
 
+        <hr>
+
         <h3>Rooms (${rooms.length})</h3>
 
         ${
           rooms.length
             ? `
-            <ul>
-              ${rooms
-                .map(
-                  (room) => `
-                    <li>
-                      <strong>${room.name || room.roomTypeName || "Unnamed Room"}</strong><br>
-                      ID: ${room.id}
-                    </li>
-                  `
-                )
-                .join("")}
-            </ul>
-          `
+              <ul>
+                ${rooms
+                  .map(
+                    (room) => `
+                      <li>
+                        <strong>${room.name || room.roomTypeName || "Unnamed Room"}</strong><br>
+                        ID: ${room.id}<br>
+                        Sleeps: ${room.maxGuests ?? "-"}
+                      </li>
+                    `
+                  )
+                  .join("")}
+              </ul>
+            `
             : "<p>No rooms found.</p>"
         }
 
+        <hr>
+
         <details>
-          <summary>View Property JSON</summary>
+          <summary>Property JSON</summary>
           <pre>${JSON.stringify(details.property, null, 2)}</pre>
         </details>
 
         <details>
-          <summary>View Rooms JSON</summary>
+          <summary>Rooms JSON</summary>
           <pre>${JSON.stringify(rooms, null, 2)}</pre>
+        </details>
+
+        <details>
+          <summary>Calendar JSON</summary>
+          <pre>${JSON.stringify(details.calendar, null, 2)}</pre>
         </details>
       `;
 
       propertiesContainer.appendChild(div);
     }
+
   } catch (error) {
     console.error(error);
 
@@ -92,3 +106,4 @@ async function loadProperties() {
     `;
   }
 }
+</script>
