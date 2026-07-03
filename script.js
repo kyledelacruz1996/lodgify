@@ -1,4 +1,4 @@
-<script>
+
 const loadBtn = document.getElementById("loadProperties");
 const propertiesContainer = document.getElementById("properties");
 
@@ -106,4 +106,3 @@ async function loadProperties() {
     `;
   }
 }
-</script>
